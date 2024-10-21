@@ -20,11 +20,17 @@ import com.lyft.kronos.SyncListener
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Date
+import java.util.Locale
 
 class SyncViewModel(private val application: Application) : ViewModel() {
 
+    val sdf = SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", Locale.US)
     private val androidClock = AndroidClockFactory.createDeviceClock()
     private val _ntpTimeState = mutableStateOf("")
     val ntpTimeState: State<String> = _ntpTimeState
@@ -32,10 +38,19 @@ class SyncViewModel(private val application: Application) : ViewModel() {
     private val _timeState = mutableStateOf("")
     val timeState: State<String> = _timeState
 
+    private var timeGovDate: Date? = null
+    private val _timeGovState = mutableStateOf<String>("")
+    val timeGovState: State<String> = _timeGovState
+
+    private val _timeGovSyncResult = mutableStateOf(false)
+    val timeGovSyncResult = _timeGovSyncResult
+
     private val _syncResult = mutableStateOf(false)
     val syncResult: State<Boolean> = _syncResult
 
     private val appTimer: AppTimer
+
+    private val client = OkHttpClient()
 
     private val syncListener = object : SyncListener {
         override fun onError(host: String, throwable: Throwable) {
@@ -75,11 +90,40 @@ class SyncViewModel(private val application: Application) : ViewModel() {
     init {
         kronosClock.syncInBackground()
         appTimer = Timer()
+        syncTimeGov()
         appTimer.startTimer(
             Long.MAX_VALUE,
             1000,
             ::updateUi
         )
+    }
+
+    fun syncTimeGov() {
+        timeGovRequest()
+    }
+
+    private fun timeGovRequest() = viewModelScope.launch(Dispatchers.Default) {
+        try {
+            val request = Request.Builder()
+                .url("https://time.gov")
+                .build()
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) throw IOException("Unexpected code $response")
+                withContext(Dispatchers.Main) {
+                    _timeGovSyncResult.value = true
+                }
+                val dateHeader = response.header("Date")
+                if (dateHeader != null) {
+                    val date = sdf.parse(dateHeader)
+                    timeGovDate = date
+                }
+
+                Log.d(TAG, "Date: $dateHeader")
+            }
+        } catch (exception: Exception) {
+            exception.printStackTrace()
+            _timeGovSyncResult.value = false
+        }
     }
 
     private fun updateUi() {
@@ -91,6 +135,11 @@ class SyncViewModel(private val application: Application) : ViewModel() {
         } else {
             _ntpTimeState.value = "null"
         }
+        timeGovDate?.let { date ->
+            timeGovDate = Date(date.time + 1000)
+            _timeGovState.value = sdf.format(date)
+        } ?: kotlin.run { _timeGovState.value = "No data" }
+
     }
 
     fun sync() {

@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
@@ -48,13 +49,23 @@ class MainActivity : ComponentActivity() {
                 val syncState = remember {
                     syncViewModel.syncResult
                 }
+                val timeGovDateString = remember {
+                    syncViewModel.timeGovState
+                }
+                val syncTimeGovState = remember {
+                    syncViewModel.timeGovSyncResult
+                }
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
+                    Main(
                         date = dateState.value,
                         ntpDate = ntpDateState.value,
+                        timeGovDate = timeGovDateString.value,
                         modifier = Modifier.padding(innerPadding),
-                        syncResult = syncState.value,
-                        sync = syncViewModel::sync
+                        syncNtpResult = syncState.value,
+                        syncNtp = syncViewModel::sync,
+                        syncTimeGov = syncViewModel::syncTimeGov,
+                        syncTimeGovResult = syncTimeGovState.value,
+
                     )
                 }
             }
@@ -63,12 +74,15 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun Greeting(
+fun Main(
+    modifier: Modifier = Modifier,
     date: String,
     ntpDate: String,
-    modifier: Modifier = Modifier,
-    syncResult: Boolean,
-    sync: () -> Unit = {}
+    timeGovDate : String,
+    syncNtpResult: Boolean,
+    syncNtp: () -> Unit = {},
+    syncTimeGovResult : Boolean,
+    syncTimeGov: () -> Unit = {}
 ) {
 
     Column(
@@ -77,37 +91,45 @@ fun Greeting(
     ) {
         val textStyle = TextStyle(fontSize = TextUnit(24f, TextUnitType.Sp), color = Color.DarkGray)
         Text(
-            text = "Device Time: $date", style = textStyle
+            text = "Device Date: $date", style = textStyle
         )
         Text(
             text = "Ntp Date: $ntpDate", style = textStyle
         )
         Spacer(modifier = Modifier.height(height = Dp(8f)))
-        Button(onClick = { sync() }) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(text = "Sync")
-                Spacer(modifier = Modifier.width(Dp(4f)))
-                Image(
-                    modifier = Modifier.size(Dp(20f),Dp(20f)),
-                    painter = painterResource(id = if (syncResult) R.drawable.green_tick else R.drawable.error_icon),
-                    contentDescription = "Sync status icon"
-                )
-            }
-
-        }
-
+        SyncButton(sync = syncNtp, syncResult = syncNtpResult)
+        Text(
+            text = "TimeGov Date: $timeGovDate", style = textStyle, textAlign = TextAlign.Center
+        )
+        SyncButton(sync = syncTimeGov, syncResult = syncTimeGovResult)
     }
+}
 
+@Composable
+private fun SyncButton(sync: () -> Unit, syncResult: Boolean) {
+    Button(onClick = { sync() }) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(text = "Sync")
+            Spacer(modifier = Modifier.width(Dp(4f)))
+            Image(
+                modifier = Modifier.size(Dp(20f),Dp(20f)),
+                painter = painterResource(id = if (syncResult) R.drawable.green_tick else R.drawable.error_icon),
+                contentDescription = "Sync status icon"
+            )
+        }
+    }
 }
 
 @Preview(showBackground = true)
 @Composable
 fun GreetingPreview() {
     TimePOCTheme {
-        Greeting(
+        Main(
             date = "4/5/24",
-            ntpDate = "",
-            syncResult = true
+            ntpDate = "4/5/24",
+            timeGovDate = "4/5/24",
+            syncNtpResult = false,
+            syncTimeGovResult = true
         )
     }
 }
