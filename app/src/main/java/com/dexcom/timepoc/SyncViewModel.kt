@@ -24,13 +24,14 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.IOException
+import java.text.DateFormat
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 class SyncViewModel(private val application: Application) : ViewModel() {
 
-    val sdf = SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", Locale.US)
+    val sdf = SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", Locale.UK)
     private val androidClock = AndroidClockFactory.createDeviceClock()
     private val _ntpTimeState = mutableStateOf("")
     val ntpTimeState: State<String> = _ntpTimeState
@@ -39,6 +40,7 @@ class SyncViewModel(private val application: Application) : ViewModel() {
     val timeState: State<String> = _timeState
 
     private var timeGovDate: Date? = null
+    val timeGovDateHeader = mutableStateOf<String?>(null)
     private val _timeGovState = mutableStateOf<String>("")
     val timeGovState: State<String> = _timeGovState
 
@@ -113,6 +115,7 @@ class SyncViewModel(private val application: Application) : ViewModel() {
                     _timeGovSyncResult.value = true
                 }
                 val dateHeader = response.header("Date")
+                timeGovDateHeader.value = dateHeader
                 if (dateHeader != null) {
                     val date = sdf.parse(dateHeader)
                     timeGovDate = date

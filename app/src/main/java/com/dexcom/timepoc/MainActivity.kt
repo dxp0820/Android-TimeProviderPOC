@@ -55,6 +55,9 @@ class MainActivity : ComponentActivity() {
                 val syncTimeGovState = remember {
                     syncViewModel.timeGovSyncResult
                 }
+                val timeGovDateHeader = remember {
+                    syncViewModel.timeGovDateHeader
+                }
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     Main(
                         date = dateState.value,
@@ -65,7 +68,7 @@ class MainActivity : ComponentActivity() {
                         syncNtp = syncViewModel::sync,
                         syncTimeGov = syncViewModel::syncTimeGov,
                         syncTimeGovResult = syncTimeGovState.value,
-
+                        timeGovHeader = timeGovDateHeader.value
                     )
                 }
             }
@@ -82,7 +85,8 @@ fun Main(
     syncNtpResult: Boolean,
     syncNtp: () -> Unit = {},
     syncTimeGovResult : Boolean,
-    syncTimeGov: () -> Unit = {}
+    syncTimeGov: () -> Unit = {},
+    timeGovHeader : String? = null
 ) {
 
     Column(
@@ -91,17 +95,18 @@ fun Main(
     ) {
         val textStyle = TextStyle(fontSize = TextUnit(24f, TextUnitType.Sp), color = Color.DarkGray)
         Text(
-            text = "Device Date: $date", style = textStyle
+            text = "Device Date: $date"//, style = textStyle
         )
         Text(
-            text = "Ntp Date: $ntpDate", style = textStyle
+            text = "Ntp Date: $ntpDate"//, style = textStyle
         )
         Spacer(modifier = Modifier.height(height = Dp(8f)))
         SyncButton(sync = syncNtp, syncResult = syncNtpResult)
         Text(
-            text = "TimeGov Date: $timeGovDate", style = textStyle, textAlign = TextAlign.Center
+            text = "TimeGov Date: $timeGovDate", textAlign = TextAlign.Center
         )
         SyncButton(sync = syncTimeGov, syncResult = syncTimeGovResult)
+        Text(text = "Date Header: $timeGovHeader")
     }
 }
 
