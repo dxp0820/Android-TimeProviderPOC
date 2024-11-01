@@ -1,8 +1,9 @@
 package com.dexcom.timepoc
 
 import android.app.Application
+import android.content.Context
+import android.os.SystemClock
 import android.util.Log
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
@@ -22,16 +23,16 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
-import okhttp3.Request
-import java.io.IOException
-import java.text.DateFormat
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
 class SyncViewModel(private val application: Application) : ViewModel() {
 
-    val sdf = SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", Locale.UK)
+    val timeManager = TimeManager()
+    val sharedPrefsHelper = SharedPrefsHelper(application)
+
     private val androidClock = AndroidClockFactory.createDeviceClock()
     private val _ntpTimeState = mutableStateOf("")
     val ntpTimeState: State<String> = _ntpTimeState
@@ -39,7 +40,6 @@ class SyncViewModel(private val application: Application) : ViewModel() {
     private val _timeState = mutableStateOf("")
     val timeState: State<String> = _timeState
 
-    private var timeGovDate: Date? = null
     val timeGovDateHeader = mutableStateOf<String?>(null)
     private val _timeGovState = mutableStateOf<String>("")
     val timeGovState: State<String> = _timeGovState
@@ -51,8 +51,6 @@ class SyncViewModel(private val application: Application) : ViewModel() {
     val syncResult: State<Boolean> = _syncResult
 
     private val appTimer: AppTimer
-
-    private val client = OkHttpClient()
 
     private val syncListener = object : SyncListener {
         override fun onError(host: String, throwable: Throwable) {
@@ -92,12 +90,21 @@ class SyncViewModel(private val application: Application) : ViewModel() {
     init {
         kronosClock.syncInBackground()
         appTimer = Timer()
-        syncTimeGov()
         appTimer.startTimer(
             Long.MAX_VALUE,
             1000,
             ::updateUi
         )
+        val needsResync = sharedPrefsHelper.needsResync()
+        Log.d("SyncViewModel","Needs resync $needsResync")
+        _timeGovSyncResult.value = !needsResync
+        if (needsResync) {
+            timeGovRequest()
+        } else {
+            sharedPrefsHelper.getTimePoc()?.let {
+                timeGovDateHeader.value = timeManager.gmtTime(Date(it.utcTimeStamp))
+            }
+        }
     }
 
     fun syncTimeGov() {
@@ -105,31 +112,19 @@ class SyncViewModel(private val application: Application) : ViewModel() {
     }
 
     private fun timeGovRequest() = viewModelScope.launch(Dispatchers.Default) {
-        try {
-            val request = Request.Builder()
-                .url("https://time.gov")
-                .build()
-            client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) throw IOException("Unexpected code $response")
-                withContext(Dispatchers.Main) {
-                    _timeGovSyncResult.value = true
-                }
-                val dateHeader = response.header("Date")
-                timeGovDateHeader.value = dateHeader
-                if (dateHeader != null) {
-                    val date = sdf.parse(dateHeader)
-                    timeGovDate = date
-                }
-
-                Log.d(TAG, "Date: $dateHeader")
+        val dateHeader = timeManager.timeGovDateHeader()
+        if (dateHeader != null) {
+            timeGovDateHeader.value = dateHeader
+            val date = timeManager.gmtTime(dateHeader)
+            sharedPrefsHelper.saveUtcTimestamp(date?.time ?: 0)
+            withContext(Dispatchers.Main) {
+                _timeGovSyncResult.value = true
             }
-        } catch (exception: Exception) {
-            exception.printStackTrace()
-            _timeGovSyncResult.value = false
         }
     }
 
     private fun updateUi() {
+        val timePOC = sharedPrefsHelper.getTimePoc()
         _timeState.value =
             SimpleDateFormat.getTimeInstance().format(Date(androidClock.getCurrentTimeMs()))
         val ntpTimeMs = kronosClock.getCurrentNtpTimeMs()
@@ -138,11 +133,14 @@ class SyncViewModel(private val application: Application) : ViewModel() {
         } else {
             _ntpTimeState.value = "null"
         }
-        timeGovDate?.let { date ->
-            timeGovDate = Date(date.time + 1000)
-            _timeGovState.value = sdf.format(date)
+        timePOC?.let { pocDate ->
+            val cal = Calendar.getInstance().apply {
+                val timeDiff = SystemClock.elapsedRealtime() - pocDate.elapsedReadTime
+                time = Date(pocDate.utcTimeStamp)
+                add(Calendar.MILLISECOND, timeDiff.toInt())
+            }
+            _timeGovState.value = timeManager.gmtTime(cal.time)
         } ?: kotlin.run { _timeGovState.value = "No data" }
-
     }
 
     fun sync() {

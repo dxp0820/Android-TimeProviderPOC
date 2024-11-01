@@ -50,6 +50,7 @@ android {
 }
 
 dependencies {
+    implementation(libs.gson)
     implementation(libs.okhttp)
     implementation(libs.kronos.android)
     implementation(libs.androidx.core.ktx)
