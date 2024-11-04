@@ -1,7 +1,6 @@
 package com.dexcom.timepoc
 
 import android.app.Application
-import android.content.Context
 import android.os.SystemClock
 import android.util.Log
 import androidx.compose.runtime.State
@@ -11,22 +10,20 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewModelScope
-import com.lyft.kronos.AndroidClockFactory
-import com.lyft.kronos.KronosClock
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.dexcom.timepoc.timer.AppTimer
 import com.dexcom.timepoc.timer.Timer
+import com.lyft.kronos.AndroidClockFactory
+import com.lyft.kronos.KronosClock
 import com.lyft.kronos.SyncListener
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
-import java.util.Locale
 
 class SyncViewModel(private val application: Application) : ViewModel() {
 
